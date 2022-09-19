@@ -4,11 +4,11 @@
 
 #define RAPIDJSON_HAS_STDSTRING 1
 
-#include "rapidjson/include/rapidjson/error/en.h"
-#include "rapidjson/include/rapidjson/filereadstream.h"
-#include "rapidjson/include/rapidjson/schema.h"
-#include "rapidjson/include/rapidjson/stringbuffer.h"
-#include "rapidjson/include/rapidjson/prettywriter.h"
+#include <rapidjson/error/en.h>
+#include <rapidjson/filereadstream.h>
+#include <rapidjson/schema.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
 #include <tclap/CmdLine.h>
 #include <string>
 #include <iostream>
@@ -183,30 +183,30 @@ int main(int argc, char *argv[]) {
     char buffer[bufferSize];
 
     {
-        FILE *fp = fopen(schemaPath.c_str(), "r");
+        FILE *fp_schema = fopen(schemaPath.c_str(), "r");
         std::string cmd("cat ");
         cmd += schemaPath;
-        if (!fp) {
+        if (!fp_schema) {
             fprintf(outFile, "Schema file '%s' not found\n", schemaPath.c_str());
             if (fileOutput) {
                 fclose(outFile);
             }
             return -1;
         }
-        FileReadStream fs(fp, buffer, sizeof(buffer));
+        FileReadStream fs(fp_schema, buffer, sizeof(buffer));
         d.ParseStream(fs);
         if (d.HasParseError()) {
             fprintf(errFile, "Schema file '%s' is not a valid JSON\n", schemaPath.c_str());
             fprintf(errFile, "Error(offset %u): %s\n",
                 static_cast<unsigned>(d.GetErrorOffset()),
                 GetParseError_En(d.GetParseError()));
-            fclose(fp);
+            fclose(fp_schema);
             if (fileOutput) {
                 fclose(outFile);
             }
             return EXIT_FAILURE;
         }
-        fclose(fp);
+        fclose(fp_schema);
     }
     
     // Then convert the Document into SchemaDocument
@@ -215,15 +215,22 @@ int main(int argc, char *argv[]) {
     // Use reader to parse the JSON in stdin, and forward SAX events to validator
     SchemaValidator validator(sd);
     Reader reader;
-    FILE *fp2 = fopen(dataPath.c_str(), "r");
-    if (!fp2) {
-        fprintf(outFile, "JSON file '%s' not found\n", dataPath.c_str());
-        if (fileOutput) {
-            fclose(outFile);
+
+	FILE *fp_data;
+    if (dataPath.compare("-") == 0) {
+        fp_data = stdin;
+    } else {
+        fp_data = fopen(dataPath.c_str(), "r");
+        if (!fp_data) {
+            fprintf(outFile, "JSON file '%s' not found\n", dataPath.c_str());
+            if (fileOutput) {
+                fclose(outFile);
+            }
+            return -1;
         }
-        return -1;
     }
-    FileReadStream is(fp2, buffer, sizeof(buffer));
+
+    FileReadStream is(fp_data, buffer, sizeof(buffer));
     if (!reader.Parse(is, validator) && reader.GetParseErrorCode() != kParseErrorTermination) {
         // Schema validator error would cause kParseErrorTermination, which will handle it in next step.
         fprintf(errFile, "Input is not a valid JSON\n");
