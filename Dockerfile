@@ -1,4 +1,4 @@
-FROM public.ecr.aws/lambda/provided:al2.2022.09.09.11 as build
+FROM public.ecr.aws/lambda/python:3.9 as build
 
 ARG VERSION=v1.0.0
 RUN yum install -y gcc-c++
@@ -8,17 +8,15 @@ COPY ./tclap /tclap
 RUN g++ -I /rapidjson/include -I /tclap/include/ /schemavalidator.cpp -o /validator
 
 # Amazon Linux 2 containing AWS Lambda runtime
-FROM public.ecr.aws/lambda/provided:al2.2022.09.09.11
+FROM public.ecr.aws/lambda/python:3.9
 COPY --from=build /validator /cms-mrf-validator/
-COPY ./scripts/bootstrap ${LAMBDA_RUNTIME_DIR}
-COPY ./scripts/function.sh ${LAMBDA_TASK_ROOT}
-RUN yum install -y curl jq unzip &&\
-    yum clean all
+# COPY ./scripts/bootstrap ${LAMBDA_RUNTIME_DIR}
+COPY ./scripts/function.py ${LAMBDA_TASK_ROOT}
+RUN yum install -y curl gzip unzip &&\
+    rm -rf /var/cache/yum
 RUN curl -o /master.zip -L https://github.com/CMSgov/price-transparency-guide/archive/refs/heads/master.zip &&\
     unzip -d / /master.zip &&\
     rm /master.zip &&\
     mv /price-transparency-guide-master /cms-mrf-validator/price-transparency-guide
 
-# Default function validates TOC file
-# Override CMD in Lambda configuration to run other functions
-CMD [ "function.toc" ]
+CMD [ "function.lambda_handler" ]
